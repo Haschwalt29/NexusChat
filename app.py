@@ -51,10 +51,11 @@ def create_app():
     
     return app, socketio
 
+# Create the Flask app for Gunicorn
+app, socketio = create_app()
+
 def main():
     """Main application entry point."""
-    app, socketio = create_app()
-    
     if app is None:
         logger.error("Failed to create application")
         return

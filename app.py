@@ -28,10 +28,16 @@ def create_app():
     # Initialize SocketIO (manage_session ensures per-socket session persistence)
     socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet', manage_session=True)
     
-    # Initialize database
-    if not db.connect():
-        logger.error("Failed to connect to database")
-        return None
+    # Try to initialize database, but don't fail if it doesn't work
+    db_connected = False
+    try:
+        db_connected = db.connect()
+        if db_connected:
+            logger.info("Successfully connected to MongoDB")
+        else:
+            logger.warning("Failed to connect to MongoDB - some features will be limited")
+    except Exception as e:
+        logger.error(f"Database connection error: {e}")
     
     # Register blueprints
     app.register_blueprint(auth_bp)
@@ -47,12 +53,29 @@ def create_app():
     @app.route('/health')
     def health():
         """Health check endpoint."""
-        return {'status': 'healthy', 'database': 'connected'}
+        status = 'healthy' if db_connected else 'degraded'
+        return {'status': status, 'database': 'connected' if db_connected else 'disconnected'}
     
     return app, socketio
 
 # Create the Flask app for Gunicorn
-app, socketio = create_app()
+try:
+    app, socketio = create_app()
+except Exception as e:
+    logger.error(f"Failed to create application: {e}")
+    # Create a minimal app for Gunicorn
+    app = Flask(__name__)
+    app.config['SECRET_KEY'] = 'fallback-secret'
+    
+    @app.route('/')
+    def index():
+        return render_template('index.html')
+    
+    @app.route('/health')
+    def health():
+        return {'status': 'error', 'message': 'Application failed to initialize'}
+    
+    socketio = None
 
 def main():
     """Main application entry point."""
@@ -77,7 +100,8 @@ def main():
     except Exception as e:
         logger.error(f"Server error: {e}")
     finally:
-        db.close()
+        if hasattr(db, 'close'):
+            db.close()
 
 if __name__ == '__main__':
     main()

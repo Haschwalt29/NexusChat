@@ -49,6 +49,10 @@ def auth_required(f):
 def register():
     """Register a new user."""
     try:
+        # Check if database is available
+        if not hasattr(db, 'users') or db.users is None:
+            return jsonify({'message': 'Database service unavailable'}), 503
+        
         data = request.get_json()
         
         if not data or not data.get('username') or not data.get('password'):
@@ -97,6 +101,10 @@ def register():
 def login():
     """Login user and return JWT token."""
     try:
+        # Check if database is available
+        if not hasattr(db, 'users') or db.users is None:
+            return jsonify({'message': 'Database service unavailable'}), 503
+        
         data = request.get_json()
         
         if not data or not data.get('username') or not data.get('password'):
@@ -136,6 +144,10 @@ def login():
 def get_history(current_user):
     """Get user's chat history."""
     try:
+        # Check if database is available
+        if not hasattr(db, 'messages') or db.messages is None:
+            return jsonify({'message': 'Database service unavailable'}), 503
+        
         username = current_user['username']
         
         # Get last 50 messages for the user

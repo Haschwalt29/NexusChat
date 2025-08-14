@@ -36,9 +36,16 @@ def _bind_username_from_token(token: str):
 	"""Decode token and bind username to this socket session."""
 	payload = jwt.decode(token, config.JWT_SECRET, algorithms=['HS256'])
 	username = payload['username']
-	user = db.users.find_one({'username': username})
-	if not user:
-		raise ValueError('Invalid user')
+	
+	# Check if database is available
+	if hasattr(db, 'users') and db.users is not None:
+		user = db.users.find_one({'username': username})
+		if not user:
+			raise ValueError('Invalid user')
+	else:
+		# If database is not available, just validate the token
+		logger.warning("Database not available - skipping user validation")
+	
 	_connected_sid_to_username[request.sid] = username
 	socket_session['username'] = username
 	return username
@@ -116,44 +123,62 @@ def init_socketio(socketio):
 				emit('system', {'message': 'Message cannot be empty'})
 				return
 			
-			# Save user message to database
-			user_message = {
-				'username': username,
-				'sender': 'user',
-				'content': content,
-				'created_at': datetime.datetime.utcnow()
-			}
-			
-			db.messages.insert_one(user_message)
-			
-			# Emit user message back to client
-			emit('message', {
-				'sender': 'user',
-				'content': content,
-				'timestamp': user_message['created_at'].isoformat()
-			})
-			
-			# Generate AI reply
-			ai_reply = generate_ai_reply(username)
-			
-			# Save AI reply to database
-			ai_message = {
-				'username': username,
-				'sender': 'ai',
-				'content': ai_reply,
-				'created_at': datetime.datetime.utcnow()
-			}
-			
-			db.messages.insert_one(ai_message)
-			
-			# Emit AI reply to client
-			emit('message', {
-				'sender': 'ai',
-				'content': ai_reply,
-				'timestamp': ai_message['created_at'].isoformat()
-			})
-			
-			logger.info(f"Message processed for user: {username}")
+			# Check if database is available for message storage
+			if hasattr(db, 'messages') and db.messages is not None:
+				# Save user message to database
+				user_message = {
+					'username': username,
+					'sender': 'user',
+					'content': content,
+					'created_at': datetime.datetime.utcnow()
+				}
+				
+				db.messages.insert_one(user_message)
+				
+				# Emit user message back to client
+				emit('message', {
+					'sender': 'user',
+					'content': content,
+					'timestamp': user_message['created_at'].isoformat()
+				})
+				
+				# Generate AI reply
+				ai_reply = generate_ai_reply(username)
+				
+				# Save AI reply to database
+				ai_message = {
+					'username': username,
+					'sender': 'ai',
+					'content': ai_reply,
+					'created_at': datetime.datetime.utcnow()
+				}
+				
+				db.messages.insert_one(ai_message)
+				
+				# Emit AI reply to client
+				emit('message', {
+					'sender': 'ai',
+					'content': ai_reply,
+					'timestamp': ai_message['created_at'].isoformat()
+				})
+				
+				logger.info(f"Message processed for user: {username}")
+			else:
+				# Database not available - just generate AI reply without storage
+				emit('message', {
+					'sender': 'user',
+					'content': content,
+					'timestamp': datetime.datetime.utcnow().isoformat()
+				})
+				
+				ai_reply = generate_ai_reply(username)
+				emit('message', {
+					'sender': 'ai',
+					'content': ai_reply,
+					'timestamp': datetime.datetime.utcnow().isoformat()
+				})
+				
+				logger.info(f"Message processed for user: {username} (no storage)")
 			
 		except Exception as e:
 			logger.error(f"Message handling error: {e}")

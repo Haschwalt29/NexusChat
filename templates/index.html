@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NexusChat - AI Chat Application</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            width: 90%;
+            max-width: 800px;
+            height: 90vh;
+            display: flex;
+            flex-direction: column; /* header + chat grow */
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            text-align: center;
+            flex: 0 0 auto; /* fixed height */
+        }
+        
+        .auth-section {
+            padding: 30px;
+            text-align: center;
+        }
+        
+        .auth-form {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        
+        .auth-form input {
+            padding: 12px 15px;
+            border: 2px solid #e1e5e9;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+        
+        .auth-form input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+        
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: #5a6fd8;
+            transform: translateY(-2px);
+        }
+        
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+        
+        .btn-secondary:hover {
+            background: #5a6268;
+        }
+        
+        .chat-section {
+            display: none;
+            flex-direction: column; /* messages + input */
+            flex: 1 1 auto; /* take remaining space */
+            min-height: 0; /* allow children to shrink for scroll */
+            overflow: hidden; /* only messages pane scrolls */
+        }
+        
+        .chat-header {
+            background: #f8f9fa;
+            padding: 15px 20px;
+            border-bottom: 1px solid #e9ecef;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .user-info {
+            font-weight: 600;
+            color: #495057;
+        }
+        
+        .disconnect-btn {
+            background: #dc3545;
+            color: white;
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        
+        .messages-container {
+            flex: 1 1 auto; /* grow and become scrollable */
+            padding: 20px;
+            overflow-y: auto;
+            background: #f8f9fa;
+        }
+        
+        .message {
+            margin-bottom: 15px;
+            display: flex;
+            align-items: flex-start;
+        }
+        
+        .message.user {
+            justify-content: flex-end;
+        }
+        
+        .message.ai {
+            justify-content: flex-start;
+        }
+        
+        .message-content {
+            max-width: 70%;
+            padding: 12px 16px;
+            border-radius: 18px;
+            word-wrap: break-word;
+        }
+        
+        .message.user .message-content {
+            background: #667eea;
+            color: white;
+            border-bottom-right-radius: 4px;
+        }
+        
+        .message.ai .message-content {
+            background: white;
+            color: #495057;
+            border: 1px solid #e9ecef;
+            border-bottom-left-radius: 4px;
+        }
+        
+        .message-time {
+            font-size: 11px;
+            color: #6c757d;
+            margin-top: 5px;
+        }
+        
+        .input-section {
+            padding: 20px;
+            background: white;
+            border-top: 1px solid #e9ecef;
+            flex: 0 0 auto; /* keep at bottom, not sticky */
+        }
+        
+        .input-container {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .message-input {
+            flex: 1;
+            padding: 12px 15px;
+            border: 2px solid #e1e5e9;
+            border-radius: 25px;
+            font-size: 14px;
+            resize: none;
+            max-height: 140px;
+        }
+        
+        .message-input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        .send-btn {
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            cursor: pointer;
+            font-size: 18px;
+            transition: all 0.3s;
+            flex: 0 0 50px;
+        }
+        
+        .send-btn:hover {
+            background: #5a6fd8;
+            transform: scale(1.05);
+        }
+        
+        .system-message {
+            text-align: center;
+            padding: 10px;
+            margin: 10px 0;
+            background: #e3f2fd;
+            color: #1976d2;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 10px;
+            color: #6c757d;
+            font-style: italic;
+            flex: 0 0 auto;
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                width: 95%;
+                height: 92vh;
+            }
+            
+            .auth-form {
+                flex-direction: column;
+                align-items: center;
+            }
+            
+            .message-content {
+                max-width: 85%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🤖 NexusChat</h1>
+            <p>Real-time AI Chat Application</p>
+        </div>
+        
+        <!-- Authentication Section -->
+        <div id="auth-section" class="auth-section">
+            <div class="auth-form">
+                <input type="text" id="username" placeholder="Username" required>
+                <input type="password" id="password" placeholder="Password" required>
+                <button class="btn btn-primary" onclick="register()">Register</button>
+                <button class="btn btn-secondary" onclick="login()">Login</button>
+            </div>
+            <div id="auth-message"></div>
+        </div>
+        
+        <!-- Chat Section -->
+        <div id="chat-section" class="chat-section">
+            <div class="chat-header">
+                <div class="user-info">Welcome, <span id="current-user"></span>!</div>
+                <button class="disconnect-btn" onclick="disconnect()">Disconnect</button>
+            </div>
+            
+            <div class="messages-container" id="messages-container">
+                <div class="system-message">Connected to chat. Start typing to begin!</div>
+            </div>
+            
+            <div class="loading" id="loading">AI is thinking...</div>
+            
+            <div class="input-section">
+                <div class="input-container">
+                    <textarea 
+                        id="message-input" 
+                        class="message-input" 
+                        placeholder="Type your message here..."
+                        rows="1"
+                        onkeypress="handleKeyPress(event)"
+                    ></textarea>
+                    <button class="send-btn" onclick="sendMessage()">➤</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let socket = null;
+        let currentToken = null;
+        let currentUsername = null;
+
+        // API Functions
+        async function apiCall(endpoint, data) {
+            try {
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(data)
+                });
+                return await response.json();
+            } catch (error) {
+                console.error('API Error:', error);
+                return { error: 'Network error' };
+            }
+        }
+
+        async function register() {
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            
+            if (!username || !password) {
+                showAuthMessage('Please enter username and password', 'error');
+                return;
+            }
+            
+            const result = await apiCall('/api/register', { username, password });
+            
+            if (result.token) {
+                currentToken = result.token;
+                currentUsername = username;
+                showAuthMessage('Registration successful!', 'success');
+                setTimeout(connectToChat, 500);
+            } else {
+                showAuthMessage(result.message || 'Registration failed', 'error');
+            }
+        }
+
+        async function login() {
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            
+            if (!username || !password) {
+                showAuthMessage('Please enter username and password', 'error');
+                return;
+            }
+            
+            const result = await apiCall('/api/login', { username, password });
+            
+            if (result.token) {
+                currentToken = result.token;
+                currentUsername = username;
+                showAuthMessage('Login successful!', 'success');
+                setTimeout(connectToChat, 500);
+            } else {
+                showAuthMessage(result.message || 'Login failed', 'error');
+            }
+        }
+
+        function showAuthMessage(message, type) {
+            const authMessage = document.getElementById('auth-message');
+            authMessage.textContent = message;
+            authMessage.style.color = type === 'error' ? '#dc3545' : '#28a745';
+            authMessage.style.fontWeight = 'bold';
+        }
+
+        // Chat Functions
+        function connectToChat() {
+            if (!currentToken) {
+                showAuthMessage('No authentication token', 'error');
+                return;
+            }
+            
+            // Initialize Socket.IO connection
+            socket = io({
+                query: {
+                    token: currentToken
+                }
+            });
+            
+            // Socket event handlers
+            socket.on('connect', () => {
+                console.log('Connected to chat');
+                // Explicit authenticate handshake
+                socket.emit('authenticate', { token: currentToken });
+                showChatSection();
+            });
+            
+            socket.on('disconnect', () => {
+                console.log('Disconnected from chat');
+                showAuthSection();
+            });
+            
+            socket.on('message', (data) => {
+                addMessage(data.sender, data.content, data.timestamp);
+                hideLoading();
+            });
+            
+            socket.on('system', (data) => {
+                addSystemMessage(data.message);
+            });
+        }
+
+        function disconnect() {
+            if (socket) {
+                socket.disconnect();
+            }
+            currentToken = null;
+            currentUsername = null;
+            showAuthSection();
+        }
+
+        function sendMessage() {
+            const input = document.getElementById('message-input');
+            const message = input.value.trim();
+            
+            if (!message || !socket) return;
+            
+            socket.emit('send_message', { message });
+            input.value = '';
+            input.style.height = 'auto';
+            showLoading();
+        }
+
+        function handleKeyPress(event) {
+            if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
+                sendMessage();
+            }
+        }
+
+        function addMessage(sender, content, timestamp) {
+            const container = document.getElementById('messages-container');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${sender}`;
+            
+            const time = timestamp ? new Date(timestamp).toLocaleTimeString() : new Date().toLocaleTimeString();
+            
+            messageDiv.innerHTML = `
+                <div class="message-content">
+                    ${content}
+                    <div class="message-time">${time}</div>
+                </div>
+            `;
+            
+            container.appendChild(messageDiv);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function addSystemMessage(message) {
+            const container = document.getElementById('messages-container');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'system-message';
+            messageDiv.textContent = message;
+            
+            container.appendChild(messageDiv);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function showLoading() {
+            document.getElementById('loading').style.display = 'block';
+        }
+
+        function hideLoading() {
+            document.getElementById('loading').style.display = 'none';
+        }
+
+        function showChatSection() {
+            document.getElementById('auth-section').style.display = 'none';
+            document.getElementById('chat-section').style.display = 'flex';
+            document.getElementById('current-user').textContent = currentUsername;
+        }
+
+        function showAuthSection() {
+            document.getElementById('chat-section').style.display = 'none';
+            document.getElementById('auth-section').style.display = 'block';
+            document.getElementById('messages-container').innerHTML = '<div class="system-message">Connected to chat. Start typing to begin!</div>';
+        }
+
+        // Auto-resize textarea with max height
+        document.getElementById('message-input').addEventListener('input', function() {
+            this.style.height = 'auto';
+            const newHeight = Math.min(this.scrollHeight, 140);
+            this.style.height = newHeight + 'px';
+        });
+    </script>
+</body>
+</html>
+
+
+

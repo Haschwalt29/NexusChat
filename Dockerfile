@@ -18,17 +18,25 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Copy installed dependencies from builder
-COPY --from=builder /root/.local /root/.local
+# Install curl for health checks
+RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
 
-# Add local bin to PATH
-ENV PATH=/root/.local/bin:$PATH
+# Copy installed dependencies from builder
+COPY --from=builder /root/.local /home/appuser/.local
+
+# Create non-root user first
+RUN useradd -m -u 1000 appuser
+
+# Set PATH for the appuser
+ENV PATH=/home/appuser/.local/bin:$PATH
 
 # Copy application code
 COPY . .
 
-# Create non-root user
-RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
+# Change ownership to appuser
+RUN chown -R appuser:appuser /app
+
+# Switch to appuser
 USER appuser
 
 # Expose port

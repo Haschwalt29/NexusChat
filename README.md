@@ -245,18 +245,7 @@ NexusChat/
 4. Push to branch: `git push origin feature-name`
 5. Submit a pull request
 
-## 📄 License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
-
-## 🆘 Support
-
-If you encounter any issues:
-
-1. Check the logs for error messages
-2. Verify your environment variables are set correctly
-3. Ensure MongoDB is accessible
-4. Confirm your OpenAI API key is valid
 
 For additional help, please open an issue on GitHub.
 

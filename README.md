@@ -54,6 +54,8 @@ A real-time AI chat application built with Flask, Socket.IO, and OpenAI. Users c
 
 5. **Open your browser**
    Navigate to `http://localhost:5000`
+   Or check out the hosted version here:
+👉 https://nexuschat-r2st.onrender.com/
 
 ### Environment Variables
 
